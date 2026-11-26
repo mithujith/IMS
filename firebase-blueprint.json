@@ -1,0 +1,362 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user account profile and default organization selection.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 200 },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "defaultOrgId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "createdAt", "updatedAt"]
+    },
+    "UserMembership": {
+      "title": "UserMembership",
+      "description": "Index of organizations a user belongs to for the org switcher.",
+      "type": "object",
+      "properties": {
+        "orgId": { "type": "string", "maxLength": 128 },
+        "orgName": { "type": "string", "maxLength": 160 },
+        "role": { "type": "string", "enum": ["Admin", "Manager", "Sales", "Warehouse", "Accountant", "Read-only"] },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "joinedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orgId", "orgName", "role", "status", "joinedAt"]
+    },
+    "InviteToken": {
+      "title": "InviteToken",
+      "description": "Top-level pending invite lookup record created by an organization Admin.",
+      "type": "object",
+      "properties": {
+        "inviteId": { "type": "string", "maxLength": 128 },
+        "orgId": { "type": "string", "maxLength": 128 },
+        "orgName": { "type": "string", "maxLength": 160 },
+        "email": { "type": "string", "format": "email", "maxLength": 200 },
+        "role": { "type": "string", "enum": ["Admin", "Manager", "Sales", "Warehouse", "Accountant", "Read-only"] },
+        "status": { "type": "string", "enum": ["pending", "accepted", "revoked"] },
+        "invitedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["inviteId", "orgId", "orgName", "email", "role", "status", "invitedBy", "createdAt", "updatedAt"]
+    },
+    "ShareLink": {
+      "title": "ShareLink",
+      "description": "Read-only shareable invoice snapshot accessible by exact unguessable token.",
+      "type": "object",
+      "properties": {
+        "token": { "type": "string", "maxLength": 128 },
+        "orgId": { "type": "string", "maxLength": 128 },
+        "orgName": { "type": "string", "maxLength": 160 },
+        "orgAddress": { "type": "string", "maxLength": 400 },
+        "orgPhone": { "type": "string", "maxLength": 60 },
+        "orgEmail": { "type": "string", "maxLength": 200 },
+        "orgLogoUrl": { "type": "string", "maxLength": 500 },
+        "invoiceId": { "type": "string", "maxLength": 128 },
+        "invoiceNumber": { "type": "string", "maxLength": 60 },
+        "invoiceData": { "type": "object" },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["token", "orgId", "orgName", "invoiceId", "invoiceNumber", "invoiceData", "createdBy", "createdAt"]
+    },
+    "Organization": {
+      "title": "Organization",
+      "description": "Tenant organization workspace.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 160 },
+        "legalName": { "type": "string", "maxLength": 200 },
+        "currency": { "type": "string", "maxLength": 10 },
+        "address": { "type": "string", "maxLength": 400 },
+        "city": { "type": "string", "maxLength": 100 },
+        "country": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 60 },
+        "email": { "type": "string", "maxLength": 200 },
+        "taxId": { "type": "string", "maxLength": 80 },
+        "logoUrl": { "type": "string", "maxLength": 500 },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["name", "currency", "ownerId", "createdBy", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "Member": {
+      "title": "Member",
+      "description": "Organization member with RBAC role.",
+      "type": "object",
+      "properties": {
+        "organizationId": { "type": "string", "maxLength": 128 },
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 200 },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "enum": ["Admin", "Manager", "Sales", "Warehouse", "Accountant", "Read-only"] },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "inviteId": { "type": "string", "maxLength": 128 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["organizationId", "uid", "email", "displayName", "role", "status", "createdBy", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "Item": {
+      "title": "Item",
+      "description": "Inventory catalog item with denormalized stock per warehouse.",
+      "type": "object",
+      "properties": {
+        "organizationId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "sku": { "type": "string", "maxLength": 80 },
+        "unit": { "type": "string", "maxLength": 20 },
+        "category": { "type": "string", "maxLength": 100 },
+        "brand": { "type": "string", "maxLength": 100 },
+        "manufacturer": { "type": "string", "maxLength": 120 },
+        "sellingPrice": { "type": "number" },
+        "costPrice": { "type": "number" },
+        "taxId": { "type": "string", "maxLength": 128 },
+        "taxRate": { "type": "number" },
+        "taxInclusive": { "type": "boolean" },
+        "preferredVendorId": { "type": "string", "maxLength": 128 },
+        "openingStock": { "type": "number" },
+        "reorderLevel": { "type": "number" },
+        "reorderQty": { "type": "number" },
+        "barcode": { "type": "string", "maxLength": 120 },
+        "images": { "type": "array" },
+        "stockByWarehouse": { "type": "object" },
+        "committedByWarehouse": { "type": "object" },
+        "totalStock": { "type": "number" },
+        "totalCommitted": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "isDeleted": { "type": "boolean" },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["organizationId", "name", "sku", "unit", "sellingPrice", "costPrice", "reorderLevel", "stockByWarehouse", "totalStock", "status", "createdBy", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "StockLedgerEntry": {
+      "title": "StockLedgerEntry",
+      "description": "Append-only immutable stock movement ledger.",
+      "type": "object",
+      "properties": {
+        "organizationId": { "type": "string", "maxLength": 128 },
+        "itemId": { "type": "string", "maxLength": 128 },
+        "itemName": { "type": "string", "maxLength": 200 },
+        "itemSku": { "type": "string", "maxLength": 80 },
+        "warehouseId": { "type": "string", "maxLength": 128 },
+        "quantityChange": { "type": "number" },
+        "type": { "type": "string", "maxLength": 40 },
+        "referenceType": { "type": "string", "maxLength": 60 },
+        "referenceId": { "type": "string", "maxLength": 128 },
+        "referenceNumber": { "type": "string", "maxLength": 80 },
+        "unitCost": { "type": "number" },
+        "date": { "type": "string", "maxLength": 40 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["organizationId", "itemId", "warehouseId", "quantityChange", "type", "referenceType", "referenceId", "unitCost", "date", "userId", "createdBy", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "OrgModuleDocument": {
+      "title": "OrgModuleDocument",
+      "description": "Generic schema for operational subcollection records within an organization.",
+      "type": "object",
+      "properties": {
+        "organizationId": { "type": "string", "maxLength": 128 },
+        "isDeleted": { "type": "boolean" },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["organizationId", "createdBy", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "Counter": {
+      "title": "Counter",
+      "description": "Transactional sequential document numbering counter.",
+      "type": "object",
+      "properties": {
+        "organizationId": { "type": "string", "maxLength": 128 },
+        "prefix": { "type": "string", "maxLength": 20 },
+        "nextNumber": { "type": "number" },
+        "padding": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["organizationId", "prefix", "nextNumber", "padding", "updatedAt", "updatedBy"]
+    },
+    "ActivityLogEntry": {
+      "title": "ActivityLogEntry",
+      "description": "Append-only immutable audit log entry.",
+      "type": "object",
+      "properties": {
+        "organizationId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userName": { "type": "string", "maxLength": 120 },
+        "module": { "type": "string", "maxLength": 60 },
+        "action": { "type": "string", "maxLength": 60 },
+        "entityId": { "type": "string", "maxLength": 128 },
+        "entityName": { "type": "string", "maxLength": 200 },
+        "details": { "type": "string", "maxLength": 500 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["organizationId", "userId", "userName", "module", "action", "entityId", "createdBy", "createdAt", "updatedAt", "updatedBy"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Authenticated user profile document."
+    },
+    "/users/{uid}/memberships/{orgId}": {
+      "schema": { "$ref": "#/entities/UserMembership" },
+      "description": "Organizations belonging to the user."
+    },
+    "/inviteTokens/{inviteId}": {
+      "schema": { "$ref": "#/entities/InviteToken" },
+      "description": "Pending invite lookup records."
+    },
+    "/shareLinks/{shareToken}": {
+      "schema": { "$ref": "#/entities/ShareLink" },
+      "description": "Read-only shareable invoice snapshots."
+    },
+    "/organizations/{orgId}": {
+      "schema": { "$ref": "#/entities/Organization" },
+      "description": "Organization root document."
+    },
+    "/organizations/{orgId}/members/{uid}": {
+      "schema": { "$ref": "#/entities/Member" },
+      "description": "Organization members and roles."
+    },
+    "/organizations/{orgId}/invites/{inviteId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Organization email invites."
+    },
+    "/organizations/{orgId}/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Organization preferences, templates, payment terms, units."
+    },
+    "/organizations/{orgId}/counters/{counterId}": {
+      "schema": { "$ref": "#/entities/Counter" },
+      "description": "Transactional document number counters."
+    },
+    "/organizations/{orgId}/items/{itemId}": {
+      "schema": { "$ref": "#/entities/Item" },
+      "description": "Spare-parts inventory catalog items."
+    },
+    "/organizations/{orgId}/itemGroups/{groupId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Item variant groups."
+    },
+    "/organizations/{orgId}/compositeItems/{compositeId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Composite BOM assemblies."
+    },
+    "/organizations/{orgId}/priceLists/{priceListId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Customer price lists."
+    },
+    "/organizations/{orgId}/warehouses/{warehouseId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Warehouses and store locations."
+    },
+    "/organizations/{orgId}/stockLedger/{entryId}": {
+      "schema": { "$ref": "#/entities/StockLedgerEntry" },
+      "description": "Append-only stock ledger."
+    },
+    "/organizations/{orgId}/adjustments/{adjustmentId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Inventory quantity/value adjustments."
+    },
+    "/organizations/{orgId}/transferOrders/{transferId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Inter-warehouse transfer orders."
+    },
+    "/organizations/{orgId}/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Customers and addresses."
+    },
+    "/organizations/{orgId}/vendors/{vendorId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Suppliers and vendors."
+    },
+    "/organizations/{orgId}/salesOrders/{orderId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Sales orders."
+    },
+    "/organizations/{orgId}/packages/{packageId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Packed sales order packages."
+    },
+    "/organizations/{orgId}/shipments/{shipmentId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Dispatched shipments."
+    },
+    "/organizations/{orgId}/invoices/{invoiceId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Customer invoices."
+    },
+    "/organizations/{orgId}/paymentsReceived/{paymentId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Customer payments received."
+    },
+    "/organizations/{orgId}/salesReturns/{returnId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Customer sales returns."
+    },
+    "/organizations/{orgId}/creditNotes/{creditNoteId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Customer credit notes."
+    },
+    "/organizations/{orgId}/purchaseOrders/{poId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Vendor purchase orders."
+    },
+    "/organizations/{orgId}/purchaseReceives/{receiveId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Goods received against purchase orders."
+    },
+    "/organizations/{orgId}/bills/{billId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Vendor bills."
+    },
+    "/organizations/{orgId}/paymentsMade/{paymentId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Payments made to vendors."
+    },
+    "/organizations/{orgId}/vendorCredits/{creditId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Vendor credit notes."
+    },
+    "/organizations/{orgId}/taxes/{taxId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Tax rates (VAT/NBT/etc.)."
+    },
+    "/organizations/{orgId}/documents/{documentId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Stored document metadata."
+    },
+    "/organizations/{orgId}/activityLog/{logId}": {
+      "schema": { "$ref": "#/entities/ActivityLogEntry" },
+      "description": "Append-only activity history."
+    },
+    "/organizations/{orgId}/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/OrgModuleDocument" },
+      "description": "Real-time low-stock and operational alerts."
+    }
+  }
+}

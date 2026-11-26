@@ -1,0 +1,634 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isValidUserProfile(data, uid) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'defaultOrgId', 'createdAt', 'updatedAt'])
+        && data.uid == uid
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 200
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
+        && (!('defaultOrgId' in data) || (data.defaultOrgId is string && data.defaultOrgId.size() <= 128));
+    }
+
+    function isValidUserMembership(data, orgId) {
+      return data.keys().hasAll(['orgId', 'orgName', 'role', 'status', 'joinedAt'])
+        && data.keys().hasOnly(['orgId', 'orgName', 'role', 'status', 'joinedAt'])
+        && data.orgId == orgId
+        && data.orgName is string && data.orgName.size() >= 1 && data.orgName.size() <= 160
+        && data.role in ['Admin', 'Manager', 'Sales', 'Warehouse', 'Accountant', 'Read-only']
+        && data.status in ['active', 'inactive'];
+    }
+
+    function isValidOrganization(data) {
+      return data.keys().hasAll(['name', 'currency', 'ownerId', 'createdBy', 'createdAt', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly([
+          'name', 'legalName', 'currency', 'address', 'city', 'country',
+          'phone', 'email', 'taxId', 'logoUrl', 'ownerId',
+          'createdBy', 'createdAt', 'updatedAt', 'updatedBy'
+        ])
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 160
+        && data.currency is string && data.currency.size() >= 1 && data.currency.size() <= 10
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128
+        && (!('legalName' in data) || (data.legalName is string && data.legalName.size() <= 200))
+        && (!('address' in data) || (data.address is string && data.address.size() <= 400))
+        && (!('city' in data) || (data.city is string && data.city.size() <= 100))
+        && (!('country' in data) || (data.country is string && data.country.size() <= 100))
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 60))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 200))
+        && (!('taxId' in data) || (data.taxId is string && data.taxId.size() <= 80))
+        && (!('logoUrl' in data) || (data.logoUrl is string && data.logoUrl.size() <= 500));
+    }
+
+    function isValidMember(data, orgId, uid) {
+      return data.keys().hasAll(['organizationId', 'uid', 'email', 'displayName', 'role', 'status', 'createdBy', 'createdAt', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['organizationId', 'uid', 'email', 'displayName', 'role', 'status', 'inviteId', 'createdBy', 'createdAt', 'updatedAt', 'updatedBy'])
+        && data.organizationId == orgId
+        && data.uid == uid
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 200
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && data.role in ['Admin', 'Manager', 'Sales', 'Warehouse', 'Accountant', 'Read-only']
+        && data.status in ['active', 'inactive']
+        && (!('inviteId' in data) || (data.inviteId is string && data.inviteId.size() <= 128));
+    }
+
+    function isValidInviteToken(data, inviteId) {
+      return data.keys().hasAll(['inviteId', 'orgId', 'orgName', 'email', 'role', 'status', 'invitedBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['inviteId', 'orgId', 'orgName', 'email', 'role', 'status', 'invitedBy', 'createdAt', 'updatedAt'])
+        && data.inviteId == inviteId
+        && isValidId(data.orgId)
+        && data.orgName is string && data.orgName.size() >= 1 && data.orgName.size() <= 160
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 200
+        && data.role in ['Admin', 'Manager', 'Sales', 'Warehouse', 'Accountant', 'Read-only']
+        && data.status in ['pending', 'accepted', 'revoked']
+        && data.invitedBy is string && data.invitedBy.size() <= 128;
+    }
+
+    function isValidStockLedger(data, orgId) {
+      return data.keys().hasAll([
+          'organizationId', 'itemId', 'warehouseId', 'quantityChange', 'type',
+          'referenceType', 'referenceId', 'unitCost', 'date', 'userId',
+          'createdBy', 'createdAt', 'updatedAt', 'updatedBy'
+        ])
+        && data.keys().hasOnly([
+          'organizationId', 'itemId', 'itemName', 'itemSku', 'warehouseId',
+          'quantityChange', 'type', 'referenceType', 'referenceId', 'referenceNumber',
+          'unitCost', 'date', 'userId', 'notes',
+          'createdBy', 'createdAt', 'updatedAt', 'updatedBy'
+        ])
+        && data.organizationId == orgId
+        && data.itemId is string && data.itemId.size() <= 128
+        && data.warehouseId is string && data.warehouseId.size() <= 128
+        && data.quantityChange is number
+        && data.type is string && data.type.size() <= 40
+        && data.referenceType is string && data.referenceType.size() <= 60
+        && data.referenceId is string && data.referenceId.size() <= 128
+        && data.unitCost is number && data.unitCost >= 0
+        && data.date is string && data.date.size() <= 40
+        && data.userId == request.auth.uid
+        && (!('itemName' in data) || (data.itemName is string && data.itemName.size() <= 200))
+        && (!('itemSku' in data) || (data.itemSku is string && data.itemSku.size() <= 80))
+        && (!('referenceNumber' in data) || (data.referenceNumber is string && data.referenceNumber.size() <= 80))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500));
+    }
+
+    function isValidActivityLog(data, orgId) {
+      return data.keys().hasAll([
+          'organizationId', 'userId', 'userName', 'module', 'action',
+          'entityId', 'createdBy', 'createdAt', 'updatedAt', 'updatedBy'
+        ])
+        && data.keys().hasOnly([
+          'organizationId', 'userId', 'userName', 'module', 'action',
+          'entityId', 'entityName', 'details', 'createdBy', 'createdAt', 'updatedAt', 'updatedBy'
+        ])
+        && data.organizationId == orgId
+        && data.userId == request.auth.uid
+        && data.userName is string && data.userName.size() <= 120
+        && data.module is string && data.module.size() <= 60
+        && data.action is string && data.action.size() <= 60
+        && data.entityId is string && data.entityId.size() <= 128
+        && (!('entityName' in data) || (data.entityName is string && data.entityName.size() <= 200))
+        && (!('details' in data) || (data.details is string && data.details.size() <= 500));
+    }
+
+    function isValidCounter(data, orgId) {
+      return data.keys().hasAll(['organizationId', 'prefix', 'nextNumber', 'padding', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['organizationId', 'prefix', 'nextNumber', 'padding', 'updatedAt', 'updatedBy'])
+        && data.organizationId == orgId
+        && data.prefix is string && data.prefix.size() >= 1 && data.prefix.size() <= 20
+        && data.nextNumber is number && data.nextNumber >= 1
+        && data.padding is number && data.padding >= 1 && data.padding <= 12;
+    }
+
+    function isValidOrgBase(data, orgId) {
+      return data.keys().hasAll(['organizationId', 'createdBy', 'createdAt', 'updatedAt', 'updatedBy'])
+        && data.organizationId == orgId
+        && (!('isDeleted' in data) || data.isDeleted is bool);
+    }
+
+    function isValidItem(data, orgId) {
+      return isValidOrgBase(data, orgId)
+        && data.keys().hasAll(['name', 'sku', 'unit', 'sellingPrice', 'costPrice', 'reorderLevel', 'stockByWarehouse', 'totalStock', 'status'])
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 200
+        && data.sku is string && data.sku.size() >= 1 && data.sku.size() <= 80
+        && data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 20
+        && data.sellingPrice is number && data.sellingPrice >= 0
+        && data.costPrice is number && data.costPrice >= 0
+        && data.reorderLevel is number && data.reorderLevel >= 0
+        && data.stockByWarehouse is map
+        && data.totalStock is number && data.totalStock >= 0
+        && data.status in ['active', 'inactive']
+        && (!('images' in data) || (data.images is list && data.images.size() <= 10));
+    }
+
+    function isValidShareLink(data, token) {
+      return data.keys().hasAll(['token', 'orgId', 'orgName', 'invoiceId', 'invoiceNumber', 'invoiceData', 'createdBy', 'createdAt'])
+        && data.keys().hasOnly([
+          'token', 'orgId', 'orgName', 'orgAddress', 'orgPhone', 'orgEmail', 'orgLogoUrl',
+          'invoiceId', 'invoiceNumber', 'invoiceData', 'createdBy', 'createdAt'
+        ])
+        && data.token == token
+        && isValidId(data.orgId)
+        && data.orgName is string && data.orgName.size() <= 160
+        && data.invoiceId is string && data.invoiceId.size() <= 128
+        && data.invoiceNumber is string && data.invoiceNumber.size() <= 60
+        && data.invoiceData is map;
+    }
+
+    function memberDoc(orgId, uid) {
+      return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(uid));
+    }
+
+    function isOrgMember(orgId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid))
+        && memberDoc(orgId, request.auth.uid).data.status == 'active';
+    }
+
+    function hasOrgRole(orgId, roles) {
+      return isOrgMember(orgId) && memberDoc(orgId, request.auth.uid).data.role in roles;
+    }
+
+    function isOrgAdmin(orgId) {
+      return hasOrgRole(orgId, ['Admin']);
+    }
+
+    function isCreateAuditValid(orgId) {
+      return incoming().organizationId == orgId
+        && incoming().createdBy == request.auth.uid
+        && incoming().updatedBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+    }
+
+    function isUpdateAuditValid(orgId) {
+      return incoming().organizationId == orgId
+        && incoming().organizationId == existing().organizationId
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedBy == request.auth.uid
+        && incoming().updatedAt == request.time;
+    }
+
+    match /users/{uid} {
+      allow get: if isOwner(uid) && isValidId(uid);
+      allow create: if isOwner(uid) && isValidId(uid)
+        && isValidUserProfile(incoming(), uid)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isOwner(uid) && isValidId(uid)
+        && isValidUserProfile(incoming(), uid)
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+
+      match /memberships/{orgId} {
+        allow get: if isOwner(uid) && isValidId(orgId);
+        allow list: if isOwner(uid);
+        allow create: if isValidId(orgId)
+          && isValidUserMembership(incoming(), orgId)
+          && incoming().joinedAt == request.time
+          && (
+            isOrgAdmin(orgId)
+            || (
+              isOwner(uid)
+              && getAfter(/databases/$(database)/documents/organizations/$(orgId)/members/$(uid)).data.role == incoming().role
+            )
+          );
+        allow update: if isOrgAdmin(orgId)
+          && isValidId(orgId)
+          && isValidUserMembership(incoming(), orgId);
+        allow delete: if isOwner(uid) || isOrgAdmin(orgId);
+      }
+    }
+
+    match /inviteTokens/{inviteId} {
+      allow get: if isValidId(inviteId)
+        && (
+          (isEmailVerified() && existing().email == request.auth.token.email)
+          || isOrgAdmin(existing().orgId)
+        );
+      allow list: if isEmailVerified()
+        && resource.data.email == request.auth.token.email;
+      allow create: if isValidId(inviteId)
+        && isOrgAdmin(incoming().orgId)
+        && isValidInviteToken(incoming(), inviteId)
+        && incoming().invitedBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(inviteId)
+        && isValidInviteToken(incoming(), inviteId)
+        && incoming().orgId == existing().orgId
+        && incoming().email == existing().email
+        && incoming().role == existing().role
+        && incoming().invitedBy == existing().invitedBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isOrgAdmin(existing().orgId)
+          || (
+            isEmailVerified()
+            && existing().email == request.auth.token.email
+            && existing().status == 'pending'
+            && incoming().status == 'accepted'
+          )
+        );
+      allow delete: if isValidId(inviteId) && isOrgAdmin(existing().orgId);
+    }
+
+    match /shareLinks/{shareToken} {
+      allow get: if isValidId(shareToken);
+      allow list: if false;
+      allow create: if isValidId(shareToken)
+        && hasOrgRole(incoming().orgId, ['Admin', 'Manager', 'Sales', 'Accountant'])
+        && isValidShareLink(incoming(), shareToken)
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update, delete: if isValidId(shareToken)
+        && hasOrgRole(existing().orgId, ['Admin', 'Manager', 'Sales', 'Accountant']);
+    }
+
+    match /organizations/{orgId} {
+      allow get: if isValidId(orgId) && isOrgMember(orgId);
+      allow create: if isSignedIn() && isValidId(orgId)
+        && isValidOrganization(incoming())
+        && incoming().ownerId == request.auth.uid
+        && incoming().createdBy == request.auth.uid
+        && incoming().updatedBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(orgId) && isOrgAdmin(orgId)
+        && isValidOrganization(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedBy == request.auth.uid
+        && incoming().updatedAt == request.time;
+      allow delete: if isValidId(orgId) && isOrgAdmin(orgId);
+
+      match /members/{uid} {
+        allow get: if isValidId(uid) && (isOwner(uid) || isOrgMember(orgId));
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(uid)
+          && isValidMember(incoming(), orgId, uid)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && (
+            (isOrgAdmin(orgId) && incoming().createdBy == request.auth.uid && incoming().updatedBy == request.auth.uid)
+            || (
+              isOwner(uid)
+              && incoming().role == 'Admin'
+              && incoming().createdBy == request.auth.uid
+              && incoming().updatedBy == request.auth.uid
+              && getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.ownerId == request.auth.uid
+            )
+            || (
+              isOwner(uid)
+              && isEmailVerified()
+              && 'inviteId' in incoming()
+              && exists(/databases/$(database)/documents/inviteTokens/$(incoming().inviteId))
+              && get(/databases/$(database)/documents/inviteTokens/$(incoming().inviteId)).data.orgId == orgId
+              && get(/databases/$(database)/documents/inviteTokens/$(incoming().inviteId)).data.email == request.auth.token.email
+              && get(/databases/$(database)/documents/inviteTokens/$(incoming().inviteId)).data.role == incoming().role
+              && get(/databases/$(database)/documents/inviteTokens/$(incoming().inviteId)).data.status == 'pending'
+              && incoming().createdBy == request.auth.uid
+              && incoming().updatedBy == request.auth.uid
+            )
+          );
+        allow update: if isValidId(uid) && isOrgAdmin(orgId)
+          && isValidMember(incoming(), orgId, uid)
+          && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(uid) && isOrgAdmin(orgId);
+      }
+
+      match /invites/{inviteId} {
+        allow get: if isValidId(inviteId) && isOrgAdmin(orgId);
+        allow list: if isOrgAdmin(orgId);
+        allow create: if isValidId(inviteId) && isOrgAdmin(orgId)
+          && isValidOrgBase(incoming(), orgId)
+          && isCreateAuditValid(orgId);
+        allow update: if isValidId(inviteId)
+          && isValidOrgBase(incoming(), orgId)
+          && isUpdateAuditValid(orgId)
+          && (
+            isOrgAdmin(orgId)
+            || (
+              isOrgMember(orgId)
+              && isEmailVerified()
+              && existing().email == request.auth.token.email
+              && incoming().status == 'accepted'
+            )
+          );
+        allow delete: if isValidId(inviteId) && isOrgAdmin(orgId);
+      }
+
+      match /settings/{settingId} {
+        allow get: if isValidId(settingId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(settingId) && isOrgAdmin(orgId)
+          && isValidOrgBase(incoming(), orgId)
+          && isCreateAuditValid(orgId);
+        allow update: if isValidId(settingId) && isOrgAdmin(orgId)
+          && isValidOrgBase(incoming(), orgId)
+          && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(settingId) && isOrgAdmin(orgId);
+      }
+
+      match /counters/{counterId} {
+        allow get: if isValidId(counterId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(counterId)
+          && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Warehouse', 'Accountant'])
+          && isValidCounter(incoming(), orgId)
+          && incoming().updatedBy == request.auth.uid
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(counterId)
+          && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Warehouse', 'Accountant'])
+          && isValidCounter(incoming(), orgId)
+          && incoming().organizationId == existing().organizationId
+          && incoming().updatedBy == request.auth.uid
+          && incoming().updatedAt == request.time;
+        allow delete: if false;
+      }
+
+      match /stockLedger/{entryId} {
+        allow get: if isValidId(entryId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(entryId)
+          && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Warehouse', 'Accountant'])
+          && isValidStockLedger(incoming(), orgId)
+          && isCreateAuditValid(orgId);
+        allow update, delete: if false;
+      }
+
+      match /activityLog/{logId} {
+        allow get: if isValidId(logId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(logId)
+          && isOrgMember(orgId)
+          && isValidActivityLog(incoming(), orgId)
+          && isCreateAuditValid(orgId);
+        allow update, delete: if false;
+      }
+
+      match /notifications/{notificationId} {
+        allow get: if isValidId(notificationId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(notificationId)
+          && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Warehouse', 'Accountant'])
+          && isValidOrgBase(incoming(), orgId)
+          && isCreateAuditValid(orgId);
+        allow update: if isValidId(notificationId)
+          && isOrgMember(orgId)
+          && isValidOrgBase(incoming(), orgId)
+          && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(notificationId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /items/{itemId} {
+        allow get: if isValidId(itemId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(itemId)
+          && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse'])
+          && isValidItem(incoming(), orgId)
+          && isCreateAuditValid(orgId);
+        allow update: if isValidId(itemId)
+          && isValidItem(incoming(), orgId)
+          && isUpdateAuditValid(orgId)
+          && (
+            hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse'])
+            || (
+              hasOrgRole(orgId, ['Sales', 'Accountant'])
+              && incoming().diff(existing()).affectedKeys().hasOnly([
+                'stockByWarehouse', 'committedByWarehouse', 'totalStock', 'totalCommitted', 'updatedAt', 'updatedBy'
+              ])
+            )
+          );
+        allow delete: if isValidId(itemId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /itemGroups/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /compositeItems/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /priceLists/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /warehouses/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /adjustments/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /transferOrders/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /customers/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /salesOrders/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Warehouse', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /packages/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /shipments/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /invoices/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /paymentsReceived/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /salesReturns/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /creditNotes/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /vendors/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /purchaseOrders/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /purchaseReceives/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Warehouse']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /bills/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /paymentsMade/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /vendorCredits/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+
+      match /taxes/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && isOrgAdmin(orgId);
+      }
+
+      match /documents/{docId} {
+        allow get: if isValidId(docId) && isOrgMember(orgId);
+        allow list: if isOrgMember(orgId);
+        allow create: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Warehouse', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isCreateAuditValid(orgId);
+        allow update: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager', 'Sales', 'Warehouse', 'Accountant']) && isValidOrgBase(incoming(), orgId) && isUpdateAuditValid(orgId);
+        allow delete: if isValidId(docId) && hasOrgRole(orgId, ['Admin', 'Manager']);
+      }
+    }
+  }
+}

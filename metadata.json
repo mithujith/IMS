@@ -1,0 +1,6 @@
+{
+  "name": "A & P Brothers Inventory",
+  "description": "Cloud-synced inventory, invoicing, and billing platform for A & P Brothers (Pvt) Ltd motorcycle spare parts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
